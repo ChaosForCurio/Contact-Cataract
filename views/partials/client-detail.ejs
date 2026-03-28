@@ -1,0 +1,68 @@
+<div class="space-y-6">
+    <div class="flex items-start justify-between">
+        <div>
+            <h2 class="text-3xl font-bold tracking-tight pr-4"><%- client.name %></h2>
+            <p class="text-gray-400 text-sm uppercase tracking-widest"><%- client.role || 'Customer' %></p>
+        </div>
+        <button type="button" onclick="toggleSidebar(false)" class="lg:hidden text-gray-500 hover:text-white p-1 -mt-1 -mr-2 transition-colors">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+    </div>
+
+    <!-- Relationship -->
+    <div class="space-y-2">
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-widest">Relationship Intensity</label>
+        <div class="custom-progress">
+            <div class="progress-bar bg-loyal" style="--width: <%- client.relationship_score %>%; width: var(--width);"></div>
+        </div>
+        <div class="flex justify-between text-[10px] font-bold text-gray-500 italic">
+            <span>UNTRUSTED</span>
+            <span class="text-loyal"><%- (client.relationship_score >= 80) ? 'LOYAL' : (client.relationship_score >= 50 ? 'FRIENDLY' : 'DISTANT') %></span>
+        </div>
+    </div>
+
+    <!-- Addiction -->
+    <div class="space-y-2">
+        <label class="text-xs font-bold text-gray-500 uppercase tracking-widest">Addiction Level</label>
+        <div class="custom-progress">
+            <div class="progress-bar bg-addiction" style="--width: <%- client.addiction_score %>%; width: var(--width);"></div>
+        </div>
+        <div class="text-right text-[10px] font-bold text-addiction italic"><%- client.addiction_score %>%</div>
+    </div>
+
+    <form hx-post="/update-client-meta/<%- client.id %>" hx-trigger="change" hx-target="#sidebar-content" class="space-y-6">
+        <!-- Standards (3 Stages) -->
+        <div class="space-y-3">
+            <label class="text-xs font-bold text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                Standards <span class="text-blue-400">★</span>
+            </label>
+            <div class="flex gap-1">
+                <% ['Low', 'Medium', 'High'].forEach(level => { %>
+                    <label class="flex-1">
+                        <input type="radio" name="standards" value="<%- level %>" class="hidden peer" <%- client.standards === level ? 'checked' : '' %> />
+                        <div class="text-center py-2 text-[10px] font-bold border border-gray-700 rounded cursor-pointer transition-all
+                                  peer-checked:bg-white peer-checked:text-black peer-checked:border-white hover:border-gray-500">
+                            <%- level.toUpperCase() %>
+                        </div>
+                    </label>
+                <% }) %>
+            </div>
+        </div>
+
+        <!-- Favourite Effects (Max 3) -->
+        <div class="space-y-3">
+            <label class="text-xs font-bold text-gray-500 uppercase tracking-widest">Favourite Effects (Max 3)</label>
+            <div class="space-y-2">
+                <% for(let i=0; i<3; i++) { %>
+                    <div class="flex items-center gap-2">
+                        <span class="w-1 h-1 bg-gray-600 rounded-full"></span>
+                        <input type="text" name="tags" value="<%- (client.favourite_effects && client.favourite_effects[i]) || '' %>" 
+                               placeholder="Enter effect..."
+                               class="flex-1 bg-transparent border-b border-gray-800 focus:border-gray-500 outline-none text-sm italic py-1 transition-colors" />
+                    </div>
+                <% } %>
+            </div>
+            <p class="text-[9px] text-gray-600 italic">* Tags influence addiction level</p>
+        </div>
+    </form>
+</div>

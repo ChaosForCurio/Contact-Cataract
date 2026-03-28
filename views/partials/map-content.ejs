@@ -1,0 +1,50 @@
+<svg class="absolute inset-0 pointer-events-none w-full h-full" id="connections"></svg>
+<div class="relative w-full h-full" id="nodes">
+    <% 
+    // Stable hash function for jitter
+    const getJitter = (id, seed) => {
+        let hash = 0;
+        const str = id + seed;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return (Math.abs(hash) % 15) - 7.5; // -7.5% to +7.5%
+    }
+    %>
+    <% clients.forEach((client, index) => { 
+        const baseX = 20 + (index % 4) * 20;
+        const baseY = 20 + Math.floor(index / 4) * 20;
+        const x = baseX + getJitter(client.id, 'x');
+        const y = baseY + getJitter(client.id, 'y');
+    %>
+        <div 
+            class="absolute transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] transform -translate-x-1/2 -translate-y-1/2 group z-10"
+            id="node-<%= client.id %>"
+            style="--x: <%- x %>%; --y: <%- y %>%; left: var(--x); top: var(--y);"
+            hx-get="/client/<%= client.id %>"
+            hx-target="#sidebar-content"
+            hx-swap="innerHTML"
+        >
+            <div class="relative cursor-pointer">
+                <!-- Premium Halo -->
+                <div class="absolute inset-0 rounded-full bg-loyal/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 scale-150"></div>
+                
+                <div class="absolute inset-0 rounded-full border border-white/10 scale-125 group-hover:scale-150 transition-transform duration-500"></div>
+                <div class="absolute inset-0 rounded-full border border-white/5 scale-150 group-hover:scale-175 transition-transform duration-700"></div>
+
+                <div class="node <%- client.avatar_path ? '' : 'bg-gray-800 flex items-center justify-center' %> border-gray-500/50 group-hover:border-loyal group-hover:shadow-[0_0_20px_rgba(245,175,25,0.4)]">
+                    <% if(client.avatar_path) { %>
+                        <img src="<%- client.avatar_path %>" class="w-full h-full object-cover">
+                    <% } else { %>
+                        <span class="text-xl font-bold text-gray-400 group-hover:text-loyal"><%- client.name[0] %></span>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
+<script>
+    // Trigger redraw when this fragment is loaded
+    if (window.drawConnections) setTimeout(drawConnections, 100);
+</script>

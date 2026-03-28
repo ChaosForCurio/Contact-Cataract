@@ -1,0 +1,15 @@
+<% 
+const currentLoc = (typeof selectedLocation !== 'undefined') ? selectedLocation : 'Northtown';
+const oobAttr = (typeof isOOB !== 'undefined' && isOOB) ? 'hx-swap-oob="true"' : '';
+%>
+<div id="location-nav-inner" <%- oobAttr %> class="flex items-center lg:gap-6 text-sm font-bold text-gray-500 uppercase tracking-widest lg:pr-4 h-full">
+    <% locations.forEach(loc => { %>
+        <a href="/?location=<%- loc %>" 
+           hx-get="/?location=<%- loc %>" 
+           hx-target="#map-content" 
+           hx-push-url="true"
+           class="nav-item hover:text-white transition-colors cursor-pointer shrink-0 snap-center w-full lg:w-auto flex justify-center lg:block py-1 <%- currentLoc === loc ? 'text-white border-b-2 border-white' : 'border-b-2 border-transparent' %>">
+            <%- loc %>
+        </a>
+    <% }) %>
+</div>
