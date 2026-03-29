@@ -390,8 +390,74 @@
 
         window.addEventListener('resize', drawConnections);
     </script>
+    <style>
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: #121212;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease-out;
+        }
+        .loader-ring {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(245, 175, 25, 0.1);
+            border-top-color: #f5af19;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+    <script type="module">
+        import { StackClientApp } from "https://esm.sh/@stackframe/js@2.8.78";
+
+        const stack = new StackClientApp({
+            projectId: "<%= stackProjectId %>",
+            tokenStore: "cookie",
+        });
+
+        // Redirect logic
+        async function checkAuth() {
+            const user = await stack.getUser();
+            if (!user) {
+                console.log("No user found by Stack Auth SDK, redirecting to local login page...");
+                const returnUrl = window.location.href;
+                window.location.href = `/sign-in?returnTo=${encodeURIComponent(returnUrl)}`;
+                return;
+            } else {
+                const overlay = document.getElementById('loading-overlay');
+                if (overlay) {
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.remove(), 500);
+                }
+            }
+        }
+        checkAuth();
+
+        // Configure HTMX to send auth headers for every request
+        document.body.addEventListener('htmx:configRequest', async (event) => {
+            const authHeaders = await stack.getAuthHeaders();
+            for (const [key, value] of Object.entries(authHeaders)) {
+                event.detail.headers[key] = value;
+            }
+        });
+
+        // Global access for debugging if needed
+        window.stackApp = stack;
+    </script>
 </head>
 <body class="bg-[#121212] text-white h-screen overflow-hidden flex flex-col">
+    <!-- Loading Overlay -->
+    <div id="loading-overlay">
+        <div class="loader-ring"></div>
+        <p class="mt-4 text-xs font-bold tracking-[0.2em] text-gray-500 uppercase animate-pulse">Authenticating</p>
+    </div>
     <!-- Header -->
     <header class="h-14 flex shrink-0 border-b border-[#333]">
         <!-- Map Header Side -->
@@ -404,6 +470,18 @@
                     <%- include('partials/location-nav', { selectedLocation: selectedLocation, locations: locations }) %>
                 </div>
             </div>
+            
+            <% if (user) { %>
+            <div class="hidden sm:flex items-center gap-4 ml-4 z-10 bg-[#121212] px-4 border-l border-[#333]">
+                <div class="flex flex-col items-end">
+                    <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Logged In As</span>
+                    <span class="text-xs font-medium text-gray-300"><%= user.primaryEmail %></span>
+                </div>
+                <a href="/sign-out" class="p-2 text-gray-400 hover:text-white transition-colors" title="Sign Out">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                </a>
+            </div>
+            <% } %>
             
             <!-- Fade for visual depth on scroll -->
             <div class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-[#121212] to-transparent pointer-events-none lg:hidden z-10"></div>

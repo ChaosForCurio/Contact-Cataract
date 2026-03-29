@@ -4,6 +4,9 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./db');
 require('dotenv').config();
+const authMiddleware = require('./middleware/auth');
+const dbSchemaMiddleware = require('./middleware/db-schema');
+const { stackServerApp } = require('./stack/server');
 
 const locationImageCache = {};
 
@@ -60,6 +63,36 @@ app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Authentication UI Routes (Must be before authMiddleware to be publicly accessible)
+app.get('/sign-in', (req, res) => {
+    res.render('sign-in', { 
+        stackProjectId: process.env.Stack_Project_ID,
+        returnTo: req.query.returnTo || '/'
+    });
+});
+
+app.get('/handler/oauth-callback', (req, res) => {
+    res.render('oauth-callback', { stackProjectId: process.env.Stack_Project_ID });
+});
+
+app.get('/handler/magic-link-callback', (req, res) => {
+    res.render('magic-link-callback', { stackProjectId: process.env.Stack_Project_ID });
+});
+
+app.get('/sign-out', (req, res) => {
+    // Redirect to sign-in; the client-side check will handle the rest
+    // or we can explicitly clear cookies if we know their names.
+    // Stack Auth usually uses 'stack-access-token' for cookies.
+    res.clearCookie('stack-access-token');
+    res.clearCookie('stack-refresh-token');
+    res.redirect('/sign-in');
+});
+
+// Apply Auth Middleware to all subsequent routes (Sign-in wall)
+app.use(authMiddleware);
+// Apply DB Schema Middleware to handle data isolation
+app.use(dbSchemaMiddleware);
+
 // Strict UUID regex for validation
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -86,7 +119,7 @@ app.get('/', asyncHandler(async (req, res) => {
   const selectedLocation = req.query.location || 'Northtown';
   
   // Get dynamic locations
-  const locResult = await db.query('SELECT DISTINCT location FROM clients ORDER BY location');
+  const locResult = await req.db.query('SELECT DISTINCT location FROM clients ORDER BY location');
   let locations = locResult.rows.map(r => r.location).filter(Boolean);
   if (locations.length === 0) {
     locations = ['Northtown', 'Westville', 'Downtown', 'Docks', 'Suburbia', 'Uptown'];
@@ -94,7 +127,7 @@ app.get('/', asyncHandler(async (req, res) => {
   
   const location = locations.includes(selectedLocation) ? selectedLocation : locations[0] || 'Northtown';
   
-  const clientsResult = await db.query('SELECT * FROM clients WHERE location = $1', [location]);
+  const clientsResult = await req.db.query('SELECT * FROM clients WHERE location = $1', [location]);
   const locationImage = await fetchLocationImage(location);
   
   if (req.headers['hx-request'] && req.headers['hx-target'] === 'map-content') {
@@ -119,7 +152,8 @@ app.get('/', asyncHandler(async (req, res) => {
         clients: clientsResult.rows, 
         selectedLocation: location, 
         locations,
-        locationImage 
+        locationImage,
+        stackProjectId: process.env.Stack_Project_ID,
     });
   }
 }));
@@ -139,7 +173,7 @@ app.post('/update-client-meta/:id', asyncHandler(async (req, res) => {
   const effects = Array.isArray(tags) ? tags.filter(t => t.trim() !== '') : [];
   const addictionScore = Math.min(effects.length * 30, 100);
 
-  const result = await db.query(
+  const result = await req.db.query(
     'UPDATE clients SET standards = $1, favourite_effects = $2, relationship_score = $3, addiction_score = $4 WHERE id = $5 RETURNING *',
     [standards, effects, relScore, addictionScore, clientId]
   );
@@ -162,7 +196,7 @@ app.post('/add-client', upload.single('avatar'), asyncHandler(async (req, res) =
   const relScore = Math.min(Math.max(parseInt(relationship_score) || 50, 0), 100);
   const addScore = Math.min(Math.max(parseInt(addiction_score) || 0, 0), 100);
 
-  const result = await db.query(
+  const result = await req.db.query(
     'INSERT INTO clients (name, role, relationship_score, addiction_score, standards, favourite_effects, avatar_path, location) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
     [name.trim(), role || 'Customer', relScore, addScore, standards || 'Medium', effects, avatar_path, clientLocation]
   );
@@ -174,7 +208,7 @@ app.get('/client/:id', asyncHandler(async (req, res) => {
   const clientId = req.params.id;
   if (!uuidRegex.test(clientId)) return res.status(400).send('Invalid Client ID format');
 
-  const clientResult = await db.query('SELECT * FROM clients WHERE id = $1', [clientId]);
+  const clientResult = await req.db.query('SELECT * FROM clients WHERE id = $1', [clientId]);
   if (clientResult.rows.length === 0) return res.status(404).send('Client not found');
   res.render('partials/client-detail', { client: clientResult.rows[0] });
 }));
